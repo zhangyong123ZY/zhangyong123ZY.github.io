@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能主播提词器 - 使用说明</title>
+    <style>
+        :root {
+            --primary-color: #FF4D4D;
+            --secondary-color: #4CAF50;
+            --bg-dark: #121212;
+            --bg-light: #1E1E1E;
+            --text-main: #FFFFFF;
+            --text-secondary: #BBBBBB;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        .welcome-container {
+            background-color: var(--bg-light);
+            padding: 40px;
+            border-radius: 10px;
+            max-width: 600px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 30px;
+        }
+        
+        .steps {
+            text-align: left;
+            margin-bottom: 30px;
+        }
+        
+        .step {
+            margin-bottom: 20px;
+            padding-left: 30px;
+            position: relative;
+            line-height: 1.6;
+        }
+        
+        .step-number {
+            position: absolute;
+            left: 0;
+            top: 0;
+            background-color: var(--primary-color);
+            color: white;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 14px;
+        }
+        
+        .start-btn {
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .start-btn:hover {
+            background-color: #3e8e41;
+            transform: translateY(-2px);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+        }
+        
+        a {
+            color: var(--secondary-color);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        
+        a:hover {
+            color: #3e8e41;
+            text-decoration: underline;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* 主功能页样式 - 初始隐藏 */
+        .main-app {
+            display: none;
+            width: 100%;
+            height: 100vh;
+            flex-direction: column;
+        }
+    </style>
+</head>
+<body>
+    <!-- 欢迎/使用说明页面 -->
+    <div class="welcome-container" id="welcome-page">
+        <h1>智能主播提词器使用说明</h1>
+        
+        <div class="steps">
+            <div class="step">
+                <div class="step-number">1</div>
+                <strong>Step1：</strong>用浏览器进入抖音直播间
+            </div>
+            
+            <div class="step">
+                <div class="step-number">2</div>
+                <strong>Step2：</strong>运行WssBarrageServer.exe进行弹幕抓取
+            </div>
+            
+            <div class="step">
+                <div class="step-number">3</div>
+                <strong>Step3：</strong>点击下方按钮开始使用AI直播提词器功能
+            </div>
+        </div>
+        
+        <a href="#" class="start-btn" id="start-btn">开始使用AI直播提词器</a>
+    </div>
+    
+    <!-- 主功能页面 (初始隐藏) -->
+    <div class="main-app" id="main-app">
+        <div class="header">
+            <h1>智能主播提词器</h1>
+            <div class="status">
+                <div class="status-indicator" id="connection-status"></div>
+                <span id="status-text">未连接</span>
+            </div>
+        </div>
+        
+        <div class="container">
+            <div class="chat-container">
+                <div class="section-title">观众互动</div>
+                <div class="chat-messages" id="chat-messages"></div>
+            </div>
+            
+            <div class="prompter-container">
+                <div class="section-title prompter-title">直播话术提示</div>
+                <div class="prompter-content">
+                    <div class="prompter-display">
+                        <div id="scrolling-text" class="scrolling-text"></div>
+                    </div>
+                    <textarea class="prompter-textarea" id="prompter-text" placeholder="在此粘贴或输入您的话术内容..."></textarea>
+                    <div class="prompter-controls">
+                        <div class="speed-control">
+                            <label>滚动速度:</label>
+                            <input type="range" id="scroll-speed" min="0" max="100" value="50">
+                            <span id="speed-value">50</span>
+                        </div>
+                        <button id="start-scroll-btn">开始滚动</button>
+                    </div>
+                    <button id="update-prompter-btn">更新提示内容</button>
+                    <button id="generate-script-btn" style="margin-top: 10px;">直播间话术辅助生成</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div>
+                <button id="clear-btn">清空内容</button>
+                <button id="pause-btn" class="secondary">暂停新消息</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 配置参数
+        const config = {
+            cozeApiToken: "pat_xnxwcxPxT3D7lazTOCBiZtJ6NpubOuRZ6Tvsp2YiXKkIWVBXIkBh5a4T4fCwzOpX",
+            cozeBotId: "7483763990343319588",
+            cozeUserId: "123",
+            cozeBaseUrl: "https://api.coze.cn/open_api/v2"
+        };
+        
+        // 页面切换
+        document.getElementById('start-btn').addEventListener('click', function(e) {
+            e.preventDefault();
+            document.getElementById('welcome-page').style.display = 'none';
+            document.getElementById('main-app').style.display = 'flex';
+            initMainApp();
+        });
+        
+        // 主应用初始化
+        function initMainApp() {
+            // WebSocket连接状态
+            let ws;
+            let isConnected = false;
+            let isPaused = false;
+            let reconnectAttempts = 0;
+            const maxReconnectAttempts = 5;
+            const reconnectDelay = 3000; // 3秒
+            
+            // 提词器相关变量
+            let scrollAnimId = null;
+            let currentScrollPosition = 0;
+            let isScrolling = false;
+            let scrollSpeed = 50;
+            let textHeight = 0;
+            let displayHeight = 0;
+            
+            // DOM元素
+            const chatMessages = document.getElementById('chat-messages');
+            const clearBtn = document.getElementById('clear-btn');
+            const pauseBtn = document.getElementById('pause-btn');
+            const connectionStatus = document.getElementById('connection-status');
+            const statusText = document.getElementById('status-text');
+            const prompterText = document.getElementById('prompter-text');
+            const scrollingText = document.getElementById('scrolling-text');
+            const scrollSpeedInput = document.getElementById('scroll-speed');
+            const speedValue = document.getElementById('speed-value');
+            const startScrollBtn = document.getElementById('start-scroll-btn');
+            const updatePrompterBtn = document.getElementById('update-prompter-btn');
+            const generateScriptBtn = document.getElementById('generate-script-btn');
+            const prompterDisplay = document.querySelector('.prompter-display');
+            
+            // 初始化WebSocket连接
+            function initWebSocket() {
+                if (ws) {
+                    ws.close();
+                }
+                
+                ws = new WebSocket('ws://localhost:8888');
+                
+                ws.onopen = function() {
+                    console.log('WebSocket连接已建立');
+                    isConnected = true;
+                    reconnectAttempts = 0;
+                    updateConnectionStatus(true);
+                };
+                
+                ws.onmessage = function(event) {
+                    if (isPaused) return;
+                    
+                    try {
+                        const data = JSON.parse(event.data);
+                        // 只处理普通弹幕（类型1）
+                        if (data.Type === 1) {
+                            handleDanmuMessage(data);
+                        }
+                    } catch (e) {
+                        console.error('解析消息错误:', e);
+                    }
+                };
+                
+                ws.onerror = function(error) {
+                    console.error('WebSocket错误:', error);
+                    updateConnectionStatus(false);
+                };
+                
+                ws.onclose = function() {
+                    console.log('WebSocket连接已关闭');
+                    isConnected = false;
+                    updateConnectionStatus(false);
+                    
+                    // 自动重连逻辑
+                    if (reconnectAttempts < maxReconnectAttempts) {
+                        reconnectAttempts++;
+                        console.log(`尝试重新连接... (${reconnectAttempts}/${maxReconnectAttempts})`);
+                        setTimeout(initWebSocket, reconnectDelay);
+                    }
+                };
+            }
+            
+            // 更新连接状态显示
+            function updateConnectionStatus(connected) {
+                if (connected) {
+                    connectionStatus.classList.add('connected');
+                    statusText.textContent = '已连接';
+                } else {
+                    connectionStatus.classList.remove('connected');
+                    statusText.textContent = reconnectAttempts > 0 ? 
+                        `连接中... (${reconnectAttempts}/${maxReconnectAttempts})` : '未连接';
+                }
+            }
+            
+            // 处理弹幕消息
+            function handleDanmuMessage(data) {
+                const userData = JSON.parse(data.Data || '{}');
+                const user = userData.User || {};
+                const content = userData.Content || '';
+                const timestamp = new Date().toLocaleTimeString();
+                
+                // 创建弹幕消息元素
+                const danmuElement = document.createElement('div');
+                danmuElement.className = 'message user-message';
+                danmuElement.innerHTML = `
+                    <div class="user-info">
+                        <div class="avatar">${user.Nickname ? user.Nickname.charAt(0).toUpperCase() : '?'}</div>
+                        <span class="username">${user.Nickname || '匿名用户'}</span>
+                        <span class="timestamp">${timestamp}</span>
+                    </div>
+                    <div class="content">${content}</div>
+                `;
+                
+                // 添加到聊天列表
+                chatMessages.appendChild(danmuElement);
+                danmuElement.scrollIntoView({ behavior: 'smooth' });
+                danmuElement.classList.add('highlight');
+                
+                // 获取AI回复
+                getAIResponse(user.Nickname || '匿名用户', content, timestamp);
+                
+                // 3秒后移除高亮效果
+                setTimeout(() => {
+                    danmuElement.classList.remove('highlight');
+                }, 3000);
+            }
+            
+            // 调用Coze API获取AI回复
+            async function getAIResponse(username, question, timestamp) {
+                // 先创建一个加载中的回复占位
+                const loadingId = 'ai-reply-' + Date.now();
+                const loadingElement = document.createElement('div');
+                loadingElement.id = loadingId;
+                loadingElement.className = 'message ai-reply';
+                loadingElement.innerHTML = `
+                    <div class="user-info">
+                        <div class="avatar ai">AI</div>
+                        <span class="username ai">AI助手</span>
+                        <span class="timestamp">${timestamp}</span>
+                    </div>
+                    <div class="content loading">正在生成回复...</div>
+                `;
+                
+                chatMessages.appendChild(loadingElement);
+                loadingElement.scrollIntoView({ behavior: 'smooth' });
+                
+                try {
+                    // 构建请求数据
+                    const requestData = {
+                        bot_id: config.cozeBotId,
+                        user: config.cozeUserId,
+                        query: `用户的名字是: ${username}\n用户问的问题是：${question}`,
+                        stream: false
+                    };
+                    
+                    // 调用Coze API
+                    const response = await fetch(`${config.cozeBaseUrl}/chat`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${config.cozeApiToken}`
+                        },
+                        body: JSON.stringify(requestData)
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok && data.messages && data.messages.length > 0) {
+                        // 获取AI回复内容
+                        const aiReply = data.messages[0].content;
+                        
+                        // 更新回复内容
+                        const replyElement = document.getElementById(loadingId);
+                        if (replyElement) {
+                            replyElement.innerHTML = `
+                                <div class="user-info">
+                                    <div class="avatar ai">AI</div>
+                                    <span class="username ai">AI助手</span>
+                                    <span class="timestamp">${timestamp}</span>
+                                </div>
+                                <div class="content">
+                                    <strong>回复 ${username}:</strong>
+                                    ${aiReply}
+                                </div>
+                            `;
+                            replyElement.classList.add('highlight');
+                            
+                            // 3秒后移除高亮效果
+                            setTimeout(() => {
+                                replyElement.classList.remove('highlight');
+                            }, 3000);
+                        }
+                    } else {
+                        throw new Error(data.message || '获取AI回复失败');
+                    }
+                } catch (error) {
+                    console.error('获取AI回复错误:', error);
+                    const replyElement = document.getElementById(loadingId);
+                    if (replyElement) {
+                        replyElement.innerHTML = `
+                            <div class="user-info">
+                                <div class="avatar ai">AI</div>
+                                <span class="username ai">AI助手</span>
+                                <span class="timestamp">${timestamp}</span>
+                            </div>
+                            <div class="content">
+                                <strong>回复 ${username}:</strong>
+                                抱歉，获取AI回复时出错: ${error.message}
+                            </div>
+                        `;
+                    }
+                }
+            }
+            
+            // 提词器功能
+            function updatePrompterContent() {
+                // 保留原始文本内容（包括换行）
+                const text = prompterText.value;
+                scrollingText.textContent = text;
+                
+                // 使用更高效的方式计算文本高度
+                const measureScrollHeight = () => {
+                    // 创建一个临时div用于测量
+                    const measurer = document.createElement('div');
+                    measurer.style.position = 'absolute';
+                    measurer.style.visibility = 'hidden';
+                    measurer.style.whiteSpace = 'pre-wrap';
+                    measurer.style.width = (prompterDisplay.offsetWidth - 40) + 'px'; // 减去左右padding
+                    measurer.style.font = window.getComputedStyle(scrollingText).font;
+                    measurer.textContent = text;
+                    document.body.appendChild(measurer);
+                    
+                    const height = measurer.offsetHeight;
+                    document.body.removeChild(measurer);
+                    return height;
+                };
+                
+                // 使用requestAnimationFrame避免阻塞主线程
+                requestAnimationFrame(() => {
+                    textHeight = measureScrollHeight();
+                    displayHeight = prompterDisplay.offsetHeight;
+                    currentScrollPosition = 0;
+                    scrollingText.style.transform = `translateY(${currentScrollPosition}px)`;
+                    
+                    // 自动停止过长的文本计算
+                    if (textHeight > 10000) { // 如果文本超过10000px高度
+                        if (isScrolling) stopScrolling();
+                        startScrollBtn.disabled = true;
+                        alert('文本内容过长，请减少内容后重试');
+                        return;
+                    }
+                    
+                    // 更新按钮状态
+                    startScrollBtn.disabled = textHeight <= displayHeight;
+                });
+            }
+            
+            // 优化滚动动画
+            function startScrolling() {
+                if (isScrolling) {
+                    stopScrolling();
+                    return;
+                }
+                
+                if (textHeight <= displayHeight) {
+                    alert('文本高度不足以滚动，请添加更多内容');
+                    return;
+                }
+                
+                isScrolling = true;
+                startScrollBtn.textContent = '停止滚动';
+                let lastTime = performance.now();
+                
+                const scrollStep = (timestamp) => {
+                    if (!isScrolling) return;
+                    
+                    const delta = timestamp - lastTime;
+                    lastTime = timestamp;
+                    
+                    // 根据时间和速度计算滚动距离
+                    // 将0-100的范围映射到0-10的速度，0表示不滚动
+                    const effectiveSpeed = scrollSpeed === 0 ? 0 : scrollSpeed / 10;
+                    currentScrollPosition -= (effectiveSpeed * delta) / 16;
+                    scrollingText.style.transform = `translateY(${currentScrollPosition}px)`;
+                    
+                    // 循环滚动
+                    if (currentScrollPosition < -textHeight) {
+                        currentScrollPosition = displayHeight;
+                    }
+                    
+                    scrollAnimId = requestAnimationFrame(scrollStep);
+                };
+                
+                scrollAnimId = requestAnimationFrame(scrollStep);
+            }
+            
+            function stopScrolling() {
+                isScrolling = false;
+                startScrollBtn.textContent = '开始滚动';
+                if (scrollAnimId) {
+                    cancelAnimationFrame(scrollAnimId);
+                    scrollAnimId = null;
+                }
+            }
+            
+            // 优化粘贴事件处理
+            prompterText.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const text = (e.clipboardData || window.clipboardData).getData('text');
+                
+                // 限制粘贴内容长度
+                if (text.length > 5000) {
+                    alert('粘贴内容过长，已自动截断前5000字符');
+                    document.execCommand('insertText', false, text.substring(0, 5000));
+                } else {
+                    document.execCommand('insertText', false, text);
+                }
+                
+                // 延迟更新以避免卡顿
+                setTimeout(updatePrompterContent, 100);
+            });
+            
+            // 初始化事件监听器
+            function initEventListeners() {
+                clearBtn.addEventListener('click', () => {
+                    chatMessages.innerHTML = '';
+                });
+                
+                pauseBtn.addEventListener('click', () => {
+                    isPaused = !isPaused;
+                    pauseBtn.textContent = isPaused ? '恢复新消息' : '暂停新消息';
+                    pauseBtn.classList.toggle('secondary', !isPaused);
+                });
+                
+                scrollSpeedInput.addEventListener('input', () => {
+                    scrollSpeed = parseInt(scrollSpeedInput.value);
+                    speedValue.textContent = scrollSpeed;
+                });
+                
+                startScrollBtn.addEventListener('click', () => {
+                    if (isScrolling) {
+                        stopScrolling();
+                    } else {
+                        startScrolling();
+                    }
+                });
+                
+                updatePrompterBtn.addEventListener('click', updatePrompterContent);
+                
+                generateScriptBtn.addEventListener('click', () => {
+                    window.open('https://www.coze.cn/s/qpwRVykvoEk/', '_blank');
+                });
+            }
+            
+            // 初始化主应用
+            function init() {
+                // 添加主应用样式
+                addMainAppStyles();
+                
+                initWebSocket();
+                initEventListeners();
+                updatePrompterContent();
+                
+                // 窗口关闭前关闭WebSocket
+                window.addEventListener('beforeunload', () => {
+                    if (ws) {
+                        ws.close();
+                    }
+                });
+            }
+            
+            // 动态添加主应用样式
+            function addMainAppStyles() {
+                const style = document.createElement('style');
+                style.textContent = `
+                    .main-app {
+                        --primary-color: #FF4D4D;
+                        --secondary-color: #4CAF50;
+                        --bg-dark: #121212;
+                        --bg-light: #1E1E1E;
+                        --bg-message: #252525;
+                        --bg-ai: #2D2D2D;
+                        --bg-prompter: #2A2A2A;
+                        --bg-chat: #1A1A1A;
+                        --text-main: #FFFFFF;
+                        --text-secondary: #BBBBBB;
+                        --text-time: #888888;
+                    }
+                    
+                    .main-app {
+                        width: 100%;
+                        height: 100vh;
+                        flex-direction: column;
+                    }
+                    
+                    .header {
+                        background-color: var(--bg-light);
+                        padding: 15px 20px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+                        z-index: 10;
+                    }
+                    
+                    .header h1 {
+                        margin: 0;
+                        color: var(--primary-color);
+                        font-size: 22px;
+                    }
+                    
+                    .status {
+                        display: flex;
+                        align-items: center;
+                        font-size: 14px;
+                    }
+                    
+                    .status-indicator {
+                        width: 10px;
+                        height: 10px;
+                        border-radius: 50%;
+                        background-color: #FF5555;
+                        margin-right: 8px;
+                    }
+                    
+                    .status-indicator.connected {
+                        background-color: var(--secondary-color);
+                    }
+                    
+                    .container {
+                        display: flex;
+                        flex: 1;
+                        overflow: hidden;
+                    }
+                    
+                    .chat-container, .prompter-container {
+                        flex: 1;
+                        padding: 15px;
+                        overflow-y: auto;
+                    }
+                    
+                    .chat-container {
+                        background-color: var(--bg-chat);
+                        border-right: 1px solid #333;
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    
+                    .prompter-container {
+                        background-color: var(--bg-prompter);
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    
+                    .section-title {
+                        color: var(--secondary-color);
+                        margin: 0 0 15px 0;
+                        font-size: 16px;
+                        padding-bottom: 8px;
+                        border-bottom: 1px solid #333;
+                        position: sticky;
+                        top: 0;
+                        background-color: var(--bg-chat);
+                        z-index: 5;
+                    }
+                    
+                    .prompter-title {
+                        color: var(--primary-color);
+                        background-color: var(--bg-prompter);
+                    }
+                    
+                    .message {
+                        margin-bottom: 15px;
+                        padding: 12px;
+                        border-radius: 6px;
+                        background-color: var(--bg-message);
+                        animation: fadeIn 0.3s ease-in-out;
+                        transition: all 0.2s;
+                        max-width: 80%;
+                    }
+                    
+                    .message.ai-reply {
+                        background-color: var(--bg-ai);
+                        border-left: 3px solid var(--secondary-color);
+                        align-self: flex-start;
+                    }
+                    
+                    .message.user-message {
+                        background-color: var(--bg-message);
+                        border-right: 3px solid var(--primary-color);
+                        align-self: flex-end;
+                        margin-left: auto;
+                    }
+                    
+                    .message.highlight {
+                        box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+                    }
+                    
+                    .user-info {
+                        display: flex;
+                        align-items: center;
+                        margin-bottom: 6px;
+                    }
+                    
+                    .avatar {
+                        width: 28px;
+                        height: 28px;
+                        border-radius: 50%;
+                        background-color: #555;
+                        margin-right: 10px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-weight: bold;
+                        color: white;
+                        font-size: 14px;
+                    }
+                    
+                    .avatar.ai {
+                        background-color: var(--secondary-color);
+                    }
+                    
+                    .username {
+                        font-weight: bold;
+                        color: var(--primary-color);
+                        font-size: 14px;
+                    }
+                    
+                    .username.ai {
+                        color: var(--secondary-color);
+                    }
+                    
+                    .content {
+                        margin-left: 38px;
+                        line-height: 1.5;
+                        font-size: 15px;
+                        color: var(--text-main);
+                    }
+                    
+                    .timestamp {
+                        font-size: 12px;
+                        color: var(--text-time);
+                        margin-left: 10px;
+                    }
+                    
+                    .controls {
+                        background-color: var(--bg-light);
+                        padding: 10px 15px;
+                        display: flex;
+                        justify-content: space-between;
+                        border-top: 1px solid #333;
+                    }
+                    
+                    .main-app button {
+                        background-color: var(--secondary-color);
+                        color: white;
+                        border: none;
+                        padding: 8px 15px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 13px;
+                        transition: background-color 0.2s;
+                    }
+                    
+                    .main-app button:hover {
+                        background-color: #3e8e41;
+                    }
+                    
+                    .main-app button.secondary {
+                        background-color: #555;
+                    }
+                    
+                    .main-app button.secondary:hover {
+                        background-color: #666;
+                    }
+                    
+                    .main-app button:disabled {
+                        background-color: #333;
+                        cursor: not-allowed;
+                    }
+                    
+                    .loading {
+                        color: var(--text-secondary);
+                        font-style: italic;
+                    }
+                    
+                    @keyframes fadeIn {
+                        from { opacity: 0; transform: translateY(10px); }
+                        to { opacity: 1; transform: translateY(0); }
+                    }
+                    
+                    /* 滚动条样式 */
+                    ::-webkit-scrollbar {
+                        width: 8px;
+                    }
+                    
+                    ::-webkit-scrollbar-track {
+                        background: var(--bg-light);
+                    }
+                    
+                    ::-webkit-scrollbar-thumb {
+                        background: #555;
+                        border-radius: 4px;
+                    }
+                    
+                    ::-webkit-scrollbar-thumb:hover {
+                        background: #666;
+                    }
+                    
+                    /* 提词器样式 */
+                    .prompter-content {
+                        flex: 1;
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    
+                    .prompter-textarea {
+                        width: 100%;
+                        height: 100px;
+                        background-color: var(--bg-message);
+                        color: var(--text-main);
+                        border: 1px solid #444;
+                        border-radius: 4px;
+                        padding: 10px;
+                        margin-bottom: 10px;
+                        resize: none;
+                        font-family: inherit;
+                        white-space: pre;
+                    }
+                    
+                    .prompter-controls {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 10px;
+                    }
+                    
+                    .speed-control {
+                        display: flex;
+                        align-items: center;
+                    }
+                    
+                    .speed-control label {
+                        margin-right: 10px;
+                        font-size: 14px;
+                    }
+                    
+                    .speed-control input {
+                        width: 120px;
+                        margin-right: 10px;
+                    }
+                    
+                    .prompter-display {
+                        background-color: var(--bg-dark);
+                        color: var(--text-main);
+                        padding: 20px;
+                        border-radius: 6px;
+                        font-size: 18px;
+                        line-height: 1.6;
+                        height: 200px;
+                        overflow: hidden;
+                        position: relative;
+                        border: 1px solid #444;
+                        margin-bottom: 10px;
+                    }
+                    
+                    .scrolling-text {
+                        position: absolute;
+                        width: calc(100% - 40px);
+                        white-space: pre-wrap;
+                        word-wrap: break-word;
+                        word-break: break-word;
+                        will-change: transform;
+                        left: 20px;
+                        top: 20px;
+                    }
+                    
+                    .chat-messages {
+                        flex: 1;
+                        overflow-y: auto;
+                        display: flex;
+                        flex-direction: column;
+                        padding: 10px;
+                    }
+                    
+                    /* 响应式设计 */
+                    @media (max-width: 768px) {
+                        .container {
+                            flex-direction: column;
+                        }
+                        
+                        .chat-container, .prompter-container {
+                            width: 100%;
+                        }
+                        
+                        .chat-container {
+                            border-right: none;
+                            border-bottom: 1px solid #333;
+                        }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            // 启动主应用
+            init();
+        }
+    </script>
+</body>
+</html>
